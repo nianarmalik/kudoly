@@ -216,7 +216,7 @@ export default function TeamPage({
         },
       }));
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
+      setTimeout(() => setShowConfetti(false), 1500);
       setTimeout(() => {
         setFeedbackMessages((prev) => {
           const next = { ...prev };
@@ -339,8 +339,51 @@ export default function TeamPage({
         />
       </div>
 
-      {/* Confetti effect */}
-      {showConfetti && (
+      {/* Feedback celebration effect — emoji burst from center */}
+      {showConfetti && !isAdmin && (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {/* Central ring bursts */}
+          {[0, 0.15, 0.3].map((delay, ri) => (
+            <div
+              key={ri}
+              className="absolute top-1/2 left-1/2 animate-firework-ring rounded-full border-4 border-accent/40"
+              style={{
+                width: `${200 + ri * 120}px`,
+                height: `${200 + ri * 120}px`,
+                animationDelay: `${delay}s`,
+              }}
+            />
+          ))}
+          {/* Emoji particles bursting outward */}
+          {Array.from({ length: 16 }).map((_, i) => {
+            const angle = (i / 16) * 360;
+            const distance = 120 + Math.random() * 100;
+            const tx = Math.cos((angle * Math.PI) / 180) * distance;
+            const ty = Math.sin((angle * Math.PI) / 180) * distance;
+            const emojis = ["⭐", "💜", "✨", "🌟", "💫", "💖", "👏", "🙌"];
+            return (
+              <div
+                key={i}
+                className="absolute top-1/2 left-1/2 animate-emoji-pop"
+                style={
+                  {
+                    "--tx": `${tx}px`,
+                    "--ty": `${ty}px`,
+                    animationDelay: `${0.05 + i * 0.03}s`,
+                    fontSize: `${22 + Math.random() * 14}px`,
+                    transform: "translate(-50%, -50%)",
+                  } as React.CSSProperties
+                }
+              >
+                {emojis[i % emojis.length]}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Confetti effect — reveal all (admin only) */}
+      {showConfetti && isAdmin && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
           {Array.from({ length: 80 }).map((_, i) => {
             const delay = Math.random() * 0.4;

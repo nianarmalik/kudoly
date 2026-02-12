@@ -3,24 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const SAMPLE_WORDS = [
-  "brilliant",
-  "inspiring",
-  "creative",
-  "dedicated",
-  "reliable",
-  "thoughtful",
-  "amazing",
-  "supportive",
-  "innovative",
-  "passionate",
-  "leader",
-  "kind",
-  "talented",
-  "motivating",
-  "exceptional",
-];
-
 export default function Home() {
   const [teamName, setTeamName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -121,23 +103,6 @@ export default function Home() {
             </form>
           </div>
 
-          {/* Floating sample words */}
-          <div className="mt-16 animate-fade-in stagger-3 opacity-0">
-            <p className="text-sm text-text-muted mb-4">
-              Words your team could share:
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {SAMPLE_WORDS.map((word, i) => (
-                <span
-                  key={word}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium glass-card text-accent hover:bg-accent/10 transition-colors cursor-default"
-                  style={{ animationDelay: `${i * 0.05}s` }}
-                >
-                  {word}
-                </span>
-              ))}
-            </div>
-          </div>
         </div>
       </main>
 
