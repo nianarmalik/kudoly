@@ -1,22 +1,20 @@
-import Database from "better-sqlite3";
-import path from "path";
+import { createClient, type Client } from "@libsql/client";
 
-const DB_PATH = path.join(process.cwd(), "kudoly.db");
+let client: Client;
 
-let db: Database.Database;
-
-function getDb(): Database.Database {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
-    initDb(db);
+export function getDb(): Client {
+  if (!client) {
+    client = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
   }
-  return db;
+  return client;
 }
 
-function initDb(db: Database.Database) {
-  db.exec(`
+export async function initDb() {
+  const db = getDb();
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS teams (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -46,4 +44,13 @@ function initDb(db: Database.Database) {
   `);
 }
 
-export default getDb;
+// Ensure tables exist on first use
+let initialized = false;
+export async function ensureDb(): Promise<Client> {
+  const db = getDb();
+  if (!initialized) {
+    await initDb();
+    initialized = true;
+  }
+  return db;
+}

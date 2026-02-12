@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb from "@/lib/db";
+import { ensureDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { isPositiveWord } from "@/lib/sentiment";
 
@@ -21,7 +21,6 @@ export async function POST(
 
     const trimmedWord = word.trim().toLowerCase();
 
-    // Validate single word
     if (trimmedWord.includes(" ")) {
       return NextResponse.json(
         { error: "Feedback must be a single word" },
@@ -29,7 +28,6 @@ export async function POST(
       );
     }
 
-    // Check positivity
     if (!isPositiveWord(trimmedWord)) {
       return NextResponse.json(
         {
@@ -40,13 +38,15 @@ export async function POST(
       );
     }
 
-    const db = getDb();
+    const db = await ensureDb();
 
     // Verify member belongs to team
-    const member = db
-      .prepare("SELECT id FROM members WHERE id = ? AND team_id = ?")
-      .get(memberId, teamId);
-    if (!member) {
+    const memberResult = await db.execute({
+      sql: "SELECT id FROM members WHERE id = ? AND team_id = ?",
+      args: [memberId, teamId],
+    });
+
+    if (memberResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Member not found in this team" },
         { status: 404 }
@@ -54,28 +54,29 @@ export async function POST(
     }
 
     // Check if this voter already gave feedback for this member
-    const existing = db
-      .prepare(
-        "SELECT id FROM feedback WHERE member_id = ? AND voter_id = ?"
-      )
-      .get(memberId, voterId) as { id: string } | undefined;
+    const existingResult = await db.execute({
+      sql: "SELECT id FROM feedback WHERE member_id = ? AND voter_id = ?",
+      args: [memberId, voterId],
+    });
 
-    if (existing) {
+    if (existingResult.rows.length > 0) {
       // Update existing feedback
-      db.prepare("UPDATE feedback SET word = ? WHERE id = ?").run(
-        trimmedWord,
-        existing.id
-      );
+      const existingId = existingResult.rows[0].id as string;
+      await db.execute({
+        sql: "UPDATE feedback SET word = ? WHERE id = ?",
+        args: [trimmedWord, existingId],
+      });
       return NextResponse.json(
-        { id: existing.id, memberId, word: trimmedWord, updated: true },
+        { id: existingId, memberId, word: trimmedWord, updated: true },
         { status: 200 }
       );
     } else {
       // Create new feedback
       const id = uuidv4();
-      db.prepare(
-        "INSERT INTO feedback (id, member_id, team_id, voter_id, word) VALUES (?, ?, ?, ?, ?)"
-      ).run(id, memberId, teamId, voterId, trimmedWord);
+      await db.execute({
+        sql: "INSERT INTO feedback (id, member_id, team_id, voter_id, word) VALUES (?, ?, ?, ?, ?)",
+        args: [id, memberId, teamId, voterId, trimmedWord],
+      });
       return NextResponse.json(
         { id, memberId, word: trimmedWord, updated: false },
         { status: 201 }

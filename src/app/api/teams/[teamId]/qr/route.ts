@@ -8,7 +8,8 @@ export async function GET(
 ) {
   try {
     const { teamId } = await params;
-    const origin = request.nextUrl.searchParams.get("origin") || "http://localhost:3001";
+    const origin =
+      request.nextUrl.searchParams.get("origin") || "http://localhost:3001";
     const publicUrl = `${origin}/team/${teamId}`;
 
     const qrDataUrl = await QRCode.toDataURL(publicUrl, {
@@ -29,4 +30,3 @@ export async function GET(
     );
   }
 }
-

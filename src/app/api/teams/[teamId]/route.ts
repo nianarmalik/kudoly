@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb from "@/lib/db";
+import { ensureDb } from "@/lib/db";
 
 // GET /api/teams/[teamId] - Get team details with members and feedback
-// Pass ?admin=TOKEN to verify admin access
-// Pass ?voter=VOTER_ID to get the current user's existing votes
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
@@ -12,54 +10,59 @@ export async function GET(
     const { teamId } = await params;
     const adminToken = request.nextUrl.searchParams.get("admin");
     const voterId = request.nextUrl.searchParams.get("voter");
-    const db = getDb();
+    const db = await ensureDb();
 
-    const team = db
-      .prepare("SELECT * FROM teams WHERE id = ?")
-      .get(teamId) as
-      | { id: string; name: string; admin_token: string; created_at: string }
-      | undefined;
+    const teamResult = await db.execute({
+      sql: "SELECT * FROM teams WHERE id = ?",
+      args: [teamId],
+    });
 
-    if (!team) {
+    if (teamResult.rows.length === 0) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
+    const team = teamResult.rows[0];
     const isAdmin = adminToken === team.admin_token;
 
-    const members = db
-      .prepare("SELECT * FROM members WHERE team_id = ? ORDER BY name")
-      .all(teamId) as {
-      id: string;
-      name: string;
-      team_id: string;
-      created_at: string;
-    }[];
-
-    // Get feedback for each member + check if current voter already voted
-    const membersWithFeedback = members.map((member) => {
-      const feedback = db
-        .prepare(
-          "SELECT word, COUNT(*) as count FROM feedback WHERE member_id = ? GROUP BY word ORDER BY count DESC"
-        )
-        .all(member.id) as { word: string; count: number }[];
-
-      // Get this voter's existing feedback for this member
-      let myVote: string | null = null;
-      if (voterId) {
-        const vote = db
-          .prepare(
-            "SELECT word FROM feedback WHERE member_id = ? AND voter_id = ?"
-          )
-          .get(member.id, voterId) as { word: string } | undefined;
-        myVote = vote?.word ?? null;
-      }
-
-      return {
-        ...member,
-        feedback,
-        myVote,
-      };
+    const membersResult = await db.execute({
+      sql: "SELECT * FROM members WHERE team_id = ? ORDER BY name",
+      args: [teamId],
     });
+
+    const membersWithFeedback = await Promise.all(
+      membersResult.rows.map(async (member) => {
+        const feedbackResult = await db.execute({
+          sql: "SELECT word, COUNT(*) as count FROM feedback WHERE member_id = ? GROUP BY word ORDER BY count DESC",
+          args: [member.id as string],
+        });
+
+        const feedback = feedbackResult.rows.map((row) => ({
+          word: row.word as string,
+          count: Number(row.count),
+        }));
+
+        let myVote: string | null = null;
+        if (voterId) {
+          const voteResult = await db.execute({
+            sql: "SELECT word FROM feedback WHERE member_id = ? AND voter_id = ?",
+            args: [member.id as string, voterId],
+          });
+          myVote =
+            voteResult.rows.length > 0
+              ? (voteResult.rows[0].word as string)
+              : null;
+        }
+
+        return {
+          id: member.id,
+          name: member.name,
+          team_id: member.team_id,
+          created_at: member.created_at,
+          feedback,
+          myVote,
+        };
+      })
+    );
 
     return NextResponse.json({
       id: team.id,

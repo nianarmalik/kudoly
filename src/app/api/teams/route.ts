@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb from "@/lib/db";
+import { ensureDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 
 // POST /api/teams - Create a new team
@@ -14,13 +14,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDb();
+    const db = await ensureDb();
     const id = uuidv4();
     const adminToken = uuidv4();
 
-    db.prepare(
-      "INSERT INTO teams (id, name, admin_token) VALUES (?, ?, ?)"
-    ).run(id, name.trim(), adminToken);
+    await db.execute({
+      sql: "INSERT INTO teams (id, name, admin_token) VALUES (?, ?, ?)",
+      args: [id, name.trim(), adminToken],
+    });
 
     return NextResponse.json(
       { id, name: name.trim(), adminToken },

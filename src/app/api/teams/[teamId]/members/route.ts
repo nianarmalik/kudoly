@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb from "@/lib/db";
+import { ensureDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 
 // POST /api/teams/[teamId]/members - Add a member (admin only)
@@ -18,18 +18,19 @@ export async function POST(
       );
     }
 
-    const db = getDb();
+    const db = await ensureDb();
 
     // Verify admin access
-    const team = db
-      .prepare("SELECT id, admin_token FROM teams WHERE id = ?")
-      .get(teamId) as { id: string; admin_token: string } | undefined;
+    const teamResult = await db.execute({
+      sql: "SELECT id, admin_token FROM teams WHERE id = ?",
+      args: [teamId],
+    });
 
-    if (!team) {
+    if (teamResult.rows.length === 0) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
-    if (!adminToken || adminToken !== team.admin_token) {
+    if (!adminToken || adminToken !== teamResult.rows[0].admin_token) {
       return NextResponse.json(
         { error: "Only the team creator can add members" },
         { status: 403 }
@@ -37,12 +38,12 @@ export async function POST(
     }
 
     // Check for duplicate names
-    const existing = db
-      .prepare(
-        "SELECT id FROM members WHERE team_id = ? AND LOWER(name) = LOWER(?)"
-      )
-      .get(teamId, name.trim());
-    if (existing) {
+    const existingResult = await db.execute({
+      sql: "SELECT id FROM members WHERE team_id = ? AND LOWER(name) = LOWER(?)",
+      args: [teamId, name.trim()],
+    });
+
+    if (existingResult.rows.length > 0) {
       return NextResponse.json(
         { error: "A member with this name already exists" },
         { status: 409 }
@@ -50,9 +51,10 @@ export async function POST(
     }
 
     const id = uuidv4();
-    db.prepare(
-      "INSERT INTO members (id, team_id, name) VALUES (?, ?, ?)"
-    ).run(id, teamId, name.trim());
+    await db.execute({
+      sql: "INSERT INTO members (id, team_id, name) VALUES (?, ?, ?)",
+      args: [id, teamId, name.trim()],
+    });
 
     return NextResponse.json(
       { id, team_id: teamId, name: name.trim() },
