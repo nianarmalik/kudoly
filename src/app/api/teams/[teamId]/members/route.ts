@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/teams/[teamId]/members - Add a member (admin only)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`add-member:${ip}`, { limit: 30, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { teamId } = await params;
-    const { name, adminToken } = await request.json();
+    const { name } = await request.json();
+    // Read admin token from httpOnly cookie instead of request body
+    const adminToken = request.cookies.get(`kudoly_admin_${teamId}`)?.value;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(

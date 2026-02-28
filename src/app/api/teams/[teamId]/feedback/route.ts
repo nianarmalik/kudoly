@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { isPositiveWord } from "@/lib/sentiment";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // POST /api/teams/[teamId]/feedback - Submit or update anonymous feedback
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`feedback:${ip}`, { limit: 30, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { teamId } = await params;
     const { memberId, word, voterId } = await request.json();

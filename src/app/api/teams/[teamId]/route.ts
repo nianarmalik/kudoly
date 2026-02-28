@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureDb } from "@/lib/db";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // GET /api/teams/[teamId] - Get team details with members and feedback
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`get-team:${ip}`, { limit: 60, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const { teamId } = await params;
-    const adminToken = request.nextUrl.searchParams.get("admin");
+    // Read admin token from httpOnly cookie instead of URL query param
+    const adminToken = request.cookies.get(`kudoly_admin_${teamId}`)?.value ?? null;
     const voterId = request.nextUrl.searchParams.get("voter");
     const db = await ensureDb();
 

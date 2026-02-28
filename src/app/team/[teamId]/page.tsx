@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, use } from "react";
-import { useSearchParams } from "next/navigation";
 
 interface FeedbackWord {
   word: string;
@@ -74,8 +73,6 @@ export default function TeamPage({
   params: Promise<{ teamId: string }>;
 }) {
   const { teamId } = use(params);
-  const searchParams = useSearchParams();
-  const adminToken = searchParams.get("admin");
 
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,7 +107,7 @@ export default function TeamPage({
     const vid = getVoterId();
     try {
       const params = new URLSearchParams();
-      if (adminToken) params.set("admin", adminToken);
+      // Admin token is sent automatically via httpOnly cookie
       if (vid) params.set("voter", vid);
       const qs = params.toString();
       const url = `/api/teams/${teamId}${qs ? `?${qs}` : ""}`;
@@ -123,7 +120,7 @@ export default function TeamPage({
     } finally {
       setLoading(false);
     }
-  }, [teamId, adminToken]);
+  }, [teamId]);
 
   useEffect(() => {
     fetchTeam();
@@ -140,7 +137,7 @@ export default function TeamPage({
       const res = await fetch(`/api/teams/${teamId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newMember.trim(), adminToken }),
+        body: JSON.stringify({ name: newMember.trim() }),
       });
 
       if (!res.ok) {
@@ -173,7 +170,7 @@ export default function TeamPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team]);
 
-  const isAdmin = adminToken ? (team?.isAdmin ?? false) : false;
+  const isAdmin = team?.isAdmin ?? false;
 
   const updateFeedbackWord = (memberId: string, value: string) => {
     const val = value.replace(/\s/g, "");
@@ -250,9 +247,7 @@ export default function TeamPage({
     if (qrData) return;
     setLoadingQr(true);
     try {
-      const res = await fetch(
-        `/api/teams/${teamId}/qr?origin=${encodeURIComponent(window.location.origin)}`
-      );
+      const res = await fetch(`/api/teams/${teamId}/qr`);
       const data = await res.json();
       setQrData(data.qr);
       setQrUrl(data.url);

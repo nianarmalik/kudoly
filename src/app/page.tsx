@@ -26,7 +26,8 @@ export default function Home() {
       if (!res.ok) throw new Error("Failed to create team");
 
       const data = await res.json();
-      router.push(`/team/${data.id}?admin=${data.adminToken}`);
+      // Admin token is now set as an httpOnly cookie by the API — no need to pass in URL
+      router.push(`/team/${data.id}`);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
