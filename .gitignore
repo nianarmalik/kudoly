@@ -44,3 +44,12 @@ next-env.d.ts
 *.db
 *.db-wal
 *.db-shm
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
